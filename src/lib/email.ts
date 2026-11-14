@@ -10,7 +10,7 @@ export async function sendLifetimeAccessEmail(toEmail: string) {
 
   const resend = new Resend(process.env.RESEND_API_KEY);
 
-  await resend.emails.send({
+  const result = await resend.emails.send({
     from: FROM_ADDRESS,
     to: toEmail,
     subject: "Your PropGuard Lifetime Access is active",
@@ -29,4 +29,10 @@ export async function sendLifetimeAccessEmail(toEmail: string) {
       </div>
     `,
   });
+
+  if (result.error) {
+    console.error("Resend send failed:", result.error);
+  } else {
+    console.log("Resend send ok, id:", result.data?.id);
+  }
 }

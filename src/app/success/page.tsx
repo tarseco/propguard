@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { CheckCircle2, XCircle, ShieldAlert } from "lucide-react";
 import { getStripe } from "@/lib/stripe";
 import { sendLifetimeAccessEmail } from "@/lib/email";
@@ -34,6 +35,11 @@ export default async function SuccessPage({
 }: {
   searchParams: Promise<{ session_id?: string }>;
 }) {
+  // Commit to dynamic rendering up front so Next never attempts a
+  // prerender pass of this page (which would call verifyAndNotify twice
+  // and double-send the confirmation email).
+  await connection();
+
   const { session_id } = await searchParams;
   const { ok, email } = await verifyAndNotify(session_id);
 
