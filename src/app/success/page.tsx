@@ -3,6 +3,10 @@ import { CheckCircle2, XCircle, ShieldAlert } from "lucide-react";
 import { getStripe } from "@/lib/stripe";
 import { sendLifetimeAccessEmail } from "@/lib/email";
 
+// This page verifies a real Stripe session and sends an email on every
+// load — it must run per-request, never be prerendered or cached.
+export const instant = false;
+
 async function verifyAndNotify(sessionId: string | undefined) {
   if (!sessionId) return { ok: false, email: null as string | null };
 
