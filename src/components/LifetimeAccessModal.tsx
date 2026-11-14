@@ -11,19 +11,39 @@ export default function LifetimeAccessModal({
   onClose: () => void;
 }) {
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "submitting" | "done">("idle");
+  const [status, setStatus] = useState<"idle" | "submitting" | "error">("idle");
+  const [error, setError] = useState("");
 
   if (!open) return null;
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!email.includes("@")) return;
     setStatus("submitting");
-    setTimeout(() => setStatus("done"), 700);
+    setError("");
+
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.url) {
+        throw new Error(data.error ?? "Checkout is unavailable right now");
+      }
+
+      window.location.href = data.url;
+    } catch (err) {
+      setStatus("error");
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    }
   }
 
   function handleClose() {
     setStatus("idle");
+    setError("");
     setEmail("");
     onClose();
   }
@@ -53,50 +73,40 @@ export default function LifetimeAccessModal({
           </button>
         </div>
 
-        {status !== "done" ? (
-          <>
-            <p className="mt-2 text-sm text-slate-400">
-              One-time payment. Unlocks every blackout timer, the consistency
-              checker, and the drawdown calculator for all supported prop
-              firms — no subscription.
-            </p>
-            <form onSubmit={handleSubmit} className="mt-5 space-y-3">
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@tradingdesk.com"
-                className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 outline-none focus:border-emerald-500"
-              />
-              <button
-                type="submit"
-                disabled={status === "submitting"}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:opacity-70"
-              >
-                {status === "submitting" ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Processing…
-                  </>
-                ) : (
-                  "Reserve Lifetime Access"
-                )}
-              </button>
-              <p className="text-center text-xs text-slate-500">
-                Secure checkout opens after early-access confirmation.
-              </p>
-            </form>
-          </>
-        ) : (
-          <div className="mt-4 rounded-lg border border-emerald-800/60 bg-emerald-950/40 p-4 text-center">
-            <p className="text-sm font-medium text-emerald-300">
-              You&apos;re on the list.
-            </p>
-            <p className="mt-1 text-sm text-slate-400">
-              We&apos;ll email {email} the second checkout opens.
-            </p>
-          </div>
-        )}
+        <p className="mt-2 text-sm text-slate-400">
+          One-time payment. Unlocks every blackout timer, the consistency
+          checker, and the drawdown calculator for all supported prop firms —
+          no subscription.
+        </p>
+        <form onSubmit={handleSubmit} className="mt-5 space-y-3">
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@tradingdesk.com"
+            className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 outline-none focus:border-emerald-500"
+          />
+          <button
+            type="submit"
+            disabled={status === "submitting"}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:opacity-70"
+          >
+            {status === "submitting" ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Redirecting to checkout…
+              </>
+            ) : (
+              "Continue to Secure Checkout"
+            )}
+          </button>
+          {status === "error" && (
+            <p className="text-center text-xs text-red-400">{error}</p>
+          )}
+          <p className="text-center text-xs text-slate-500">
+            Payment is processed securely by Stripe.
+          </p>
+        </form>
       </div>
     </div>
   );
