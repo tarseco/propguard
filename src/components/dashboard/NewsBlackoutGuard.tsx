@@ -39,21 +39,66 @@ function formatDuration(ms: number): string {
   return `${minutes}m ${seconds}s`;
 }
 
+interface FeedEvent {
+  id: string;
+  label: string;
+  timestamp: number;
+}
+
 export default function NewsBlackoutGuard() {
   const [firmId, setFirmId] = useState("ftmo");
   const firm = getFirm(firmId);
 
   const [now, setNow] = useState<number>(() => Date.now());
-  const [events, setEvents] = useState<NewsEvent[]>(() => demoNewsEvents(Date.now()));
+  const [feedEvents, setFeedEvents] = useState<NewsEvent[]>(() => demoNewsEvents(Date.now()));
+  const [customEvents, setCustomEvents] = useState<NewsEvent[]>([]);
+  const [feedStatus, setFeedStatus] = useState<"loading" | "live" | "quiet" | "demo">(
+    "loading",
+  );
   const [newLabel, setNewLabel] = useState("");
   const [newTime, setNewTime] = useState("");
 
   const warnedRef = useRef<Set<string>>(new Set());
   const alertedRef = useRef<Set<string>>(new Set());
 
+  const events = useMemo(() => [...feedEvents, ...customEvents], [feedEvents, customEvents]);
+
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch("/api/news")
+      .then((res) => res.json())
+      .then((data: { source: string; events: FeedEvent[] }) => {
+        if (cancelled) return;
+        if (data.source === "forexfactory" && data.events.length > 0) {
+          setFeedEvents(
+            data.events.map((e) => ({ id: e.id, label: e.label, timestamp: e.timestamp })),
+          );
+          setFeedStatus("live");
+        } else if (data.source === "forexfactory") {
+          // Feed reachable, but nothing scheduled right now (e.g. weekend) —
+          // show reference events instead of an empty dashboard.
+          setFeedEvents(demoNewsEvents(Date.now()));
+          setFeedStatus("quiet");
+        } else {
+          setFeedEvents(demoNewsEvents(Date.now()));
+          setFeedStatus("demo");
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setFeedEvents(demoNewsEvents(Date.now()));
+        setFeedStatus("demo");
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const upcoming = useMemo(() => {
@@ -94,7 +139,7 @@ export default function NewsBlackoutGuard() {
     if (!newLabel || !newTime) return;
     const ts = new Date(newTime).getTime();
     if (Number.isNaN(ts)) return;
-    setEvents((prev) => [
+    setCustomEvents((prev) => [
       ...prev,
       { id: `custom-${Date.now()}`, label: newLabel, timestamp: ts, custom: true },
     ]);
@@ -103,7 +148,7 @@ export default function NewsBlackoutGuard() {
   }
 
   function removeEvent(id: string) {
-    setEvents((prev) => prev.filter((e) => e.id !== id));
+    setCustomEvents((prev) => prev.filter((e) => e.id !== id));
   }
 
   return (
@@ -212,7 +257,35 @@ export default function NewsBlackoutGuard() {
           )}
 
           <div className="rounded-xl border border-slate-800 bg-[#0b0f14] p-5">
-            <h3 className="text-sm font-semibold text-slate-200">Upcoming news</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-200">Upcoming news</h3>
+              <span
+                className={`flex items-center gap-1.5 text-xs ${
+                  feedStatus === "live"
+                    ? "text-emerald-400"
+                    : feedStatus === "demo" || feedStatus === "quiet"
+                    ? "text-amber-400"
+                    : "text-slate-500"
+                }`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    feedStatus === "live"
+                      ? "bg-emerald-400"
+                      : feedStatus === "demo" || feedStatus === "quiet"
+                      ? "bg-amber-400"
+                      : "bg-slate-500"
+                  }`}
+                />
+                {feedStatus === "live"
+                  ? "Live from ForexFactory"
+                  : feedStatus === "quiet"
+                  ? "No major releases right now — showing reference events"
+                  : feedStatus === "demo"
+                  ? "Demo data — live feed unavailable"
+                  : "Loading live calendar…"}
+              </span>
+            </div>
             <div className="mt-4 space-y-2">
               {upcoming.map((event) => (
                 <div

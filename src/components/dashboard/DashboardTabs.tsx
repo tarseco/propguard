@@ -46,10 +46,18 @@ export default function DashboardTabs() {
         })}
       </div>
 
+      {/* Every tab stays mounted so its state (custom events, typed numbers)
+          survives switching away and back — only visibility toggles. */}
       <div className="pt-6">
-        {active === "news" && <NewsBlackoutGuard />}
-        {active === "consistency" && <ConsistencyChecker />}
-        {active === "drawdown" && <DrawdownCalculator />}
+        <div className={active === "news" ? "block" : "hidden"}>
+          <NewsBlackoutGuard />
+        </div>
+        <div className={active === "consistency" ? "block" : "hidden"}>
+          <ConsistencyChecker />
+        </div>
+        <div className={active === "drawdown" ? "block" : "hidden"}>
+          <DrawdownCalculator />
+        </div>
       </div>
     </div>
   );
